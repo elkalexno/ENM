@@ -1,0 +1,86 @@
+#Modificado a partir del original:
+#Di Cola et al. 2017. ecospat: an R package to support spatial analyses and modeling of
+#species niches and distributions. Ecography 40: 774–787.
+
+library(ecospat)
+#1. Cargar cada modelo binario.
+#2. Generar coordenadas más presencia ausencia.
+#3. Extraer valores climaticos y unir con tabla 2.
+#4. Hacer lo mismo con cada especie.
+envs <- stack(list.files("C:/Users/elkin.noguera/Documents/WC2.0Bios30_wc2_amer_cut/","tif",full.names=TRUE)) 
+crs(envs) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+quic <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_quichua/ML_19biosMTP.tif") 
+quicpr <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_quichua/ML_19bios_quichua.tif")
+quic1 <- coordinates(quic)
+quic2<- cbind(extract(envs,quic1),getValues(quic))
+quic3<- cbind(quic1,quic2,getValues(quicpr))
+colnames(quic3)
+colnames(quic3)[22] <- "species_occ"
+colnames(quic3)[23] <- "predictions"
+
+ros <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_rothschildi/ML_19biosMTProths.tif")
+rospr <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_rothschildi/ML_19bios_rothschildi.tif")
+ros1 <- coordinates(ros)
+ros2<- cbind(extract(envs,ros1),getValues(ros))
+ros3<- cbind(ros1,ros2,getValues(rospr))
+colnames(ros3)
+colnames(ros3)[22] <- "species_occ"
+colnames(ros3)[23] <- "predictions"
+
+quic3 <- na.omit(quic3)
+ros3 <- na.omit(ros3)
+pca.env <- dudi.pca(rbind(ros3,quic3)[,3:10],scannf=F,nf=2)
+ecospat.plot.contrib(contrib=pca.env$co, eigen=pca.env$eig)
+# PCA scores for the whole study area
+scores.globclim <- pca.env$li
+# PCA scores for the species native distribution
+scores.sp.ros3 <- suprow(pca.env,ros3[which(ros3[,11]==1),3:10])$li
+# PCA scores for the species asive distribution
+scores.sp.quic3 <- suprow(pca.env,quic3[which(quic3[,11]==1),3:10])$li
+# PCA scores for the whole native study area
+scores.clim.ros3 <- suprow(pca.env,ros3[,3:10])$li
+# PCA scores for the whole invaded study area
+scores.clim.quic3 <- suprow(pca.env,quic3[,3:10])$li
+
+# gridding the native niche
+grid.clim.ros3 <- ecospat.grid.clim.dyn(glob=scores.globclim,
+                                       glob1=scores.clim.ros3,
+                                       sp=scores.sp.ros3, R=100,
+                                       th.sp=0)
+
+grid.clim.quic3 <- ecospat.grid.clim.dyn(glob=scores.globclim,
+                                       glob1=scores.clim.quic3,
+                                       sp=scores.sp.quic3, R=100,
+                                       th.sp=0)
+
+D.overlap <- ecospat.niche.overlap (grid.clim.ros3, grid.clim.quic3, cor=T)$D
+D.overlap
+
+eq.test <- ecospat.niche.equivalency.test(grid.clim.ros3, grid.clim.quic3,rep=1000, alternative = "greater")
+sim.test <- ecospat.niche.similarity.test(grid.clim.ros3, grid.clim.quic3,rep=1000, alternative = "greater", rand.type=2)
+
+ecospat.plot.overlap.test(eq.test, "D", "Equivalency")
+ecospat.plot.overlap.test(sim.test, "D", "Similarity")
+
+niche.dyn <- ecospat.niche.dyn.index (grid.clim.ros3, grid.clim.quic3, intersection = 0.1)
+
+ecospat.plot.niche.dyn(grid.clim.ros3, grid.clim.quic3, quant=0.25, interest=2,
+                       title= "Niche Overlap", name.axis1="PC1",
+                       name.axis2="PC2")
+ecospat.shift.centroids(scores.sp.ros3, scores.sp.quic3, scores.clim.ros3, scores.clim.quic3)
+
+# gridding the native niche
+grid.clim.t.ros3 <- ecospat.grid.clim.dyn(glob=as.data.frame(rbind(ros3,quic3)[,10]),
+                                         glob1=as.data.frame(ros3[,10]),
+                                         sp=as.data.frame(ros3[which(ros3[,11]==1),10]),
+                                         R=1000, th.sp=0)
+# gridding the invaded niche
+grid.clim.t.quic3 <- ecospat.grid.clim.dyn(glob=as.data.frame(rbind(ros3,quic3)[,10]),
+                                         glob1=as.data.frame(quic3[,10]),
+                                         sp=as.data.frame(quic3[which(quic3[,11]==1),10]),
+                                         R=1000, th.sp=0)
+t.dyn<-ecospat.niche.dyn.index (grid.clim.t.ros3, grid.clim.t.quic3,
+                                intersection=0.1)
+ecospat.plot.niche.dyn(grid.clim.t.ros3, grid.clim.t.quic3, quant=0,
+                       interest=2, title= "Niche Overlap",
+                       name.axis1="Temperatura")
