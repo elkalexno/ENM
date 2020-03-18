@@ -42,12 +42,12 @@ scores.clim.ros3 <- suprow(pca.env,ros3[,3:10])$li
 # PCA scores for the whole invaded study area
 scores.clim.quic3 <- suprow(pca.env,quic3[,3:10])$li
 
-# gridding the native niche
+# Densidas nicho nativo
 grid.clim.ros3 <- ecospat.grid.clim.dyn(glob=scores.globclim,
                                        glob1=scores.clim.ros3,
                                        sp=scores.sp.ros3, R=100,
                                        th.sp=0)
-
+Densidas nicho invasión
 grid.clim.quic3 <- ecospat.grid.clim.dyn(glob=scores.globclim,
                                        glob1=scores.clim.quic3,
                                        sp=scores.sp.quic3, R=100,
@@ -69,16 +69,6 @@ ecospat.plot.niche.dyn(grid.clim.ros3, grid.clim.quic3, quant=0.25, interest=2,
                        name.axis2="PC2")
 ecospat.shift.centroids(scores.sp.ros3, scores.sp.quic3, scores.clim.ros3, scores.clim.quic3)
 
-# gridding the native niche
-grid.clim.t.ros3 <- ecospat.grid.clim.dyn(glob=as.data.frame(rbind(ros3,quic3)[,10]),
-                                         glob1=as.data.frame(ros3[,10]),
-                                         sp=as.data.frame(ros3[which(ros3[,11]==1),10]),
-                                         R=1000, th.sp=0)
-# gridding the invaded niche
-grid.clim.t.quic3 <- ecospat.grid.clim.dyn(glob=as.data.frame(rbind(ros3,quic3)[,10]),
-                                         glob1=as.data.frame(quic3[,10]),
-                                         sp=as.data.frame(quic3[which(quic3[,11]==1),10]),
-                                         R=1000, th.sp=0)
 t.dyn<-ecospat.niche.dyn.index (grid.clim.t.ros3, grid.clim.t.quic3,
                                 intersection=0.1)
 ecospat.plot.niche.dyn(grid.clim.t.ros3, grid.clim.t.quic3, quant=0,
