@@ -9,8 +9,8 @@ library(ecospat)
 #4. Hacer lo mismo con cada especie.
 envs <- stack(list.files("C:/Users/elkin.noguera/Documents/WC2.0Bios30_wc2_amer_cut/","tif",full.names=TRUE)) 
 crs(envs) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-quic <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_quichua/ML_19biosMTP.tif") 
-quicpr <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_quichua/ML_19bios_quichua.tif")
+quic <- raster("../ML_19biosMTP.tif") # Nativo
+quicpr <- raster("../ML_19bios_log.tif")
 quic1 <- coordinates(quic)
 quic2<- cbind(extract(envs,quic1),getValues(quic))
 quic3<- cbind(quic1,quic2,getValues(quicpr))
@@ -18,8 +18,8 @@ colnames(quic3)
 colnames(quic3)[22] <- "species_occ"
 colnames(quic3)[23] <- "predictions"
 
-ros <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_rothschildi/ML_19biosMTProths.tif")
-rospr <- raster("C:/Users/elkin.noguera/Documents/BioModelos/Articulos EK/C_quichua/Modelos/C_rothschildi/ML_19bios_rothschildi.tif")
+ros <- raster("../ML_19biosMTP.tif") # Invasión
+rospr <- raster("../ML_19bios_log.tif")
 ros1 <- coordinates(ros)
 ros2<- cbind(extract(envs,ros1),getValues(ros))
 ros3<- cbind(ros1,ros2,getValues(rospr))
