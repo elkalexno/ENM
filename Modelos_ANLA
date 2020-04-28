@@ -1,0 +1,101 @@
+library("dismo")
+library("ENMeval")
+library("maptools")
+library("sp")
+library("rgdal")
+library('parallel')
+
+
+##################################Especies
+folder1<-"C:/Modelos_ANLA/6. Registros_finales/1. Finales_curadas/"
+file_list <- list.files(path=folder1, pattern="*.csv") # Crear una lista de todos los .csv en la carpeta
+file_list
+
+especie <- "Cerdocyonthous" # Cambiar nombre
+dir.create(paste0("C:/Modelos_ANLA/7. Modelos/", especie))
+##################################EnvMeval
+setwd("C:/Modelos_ANLA/6. Registros_finales/2. Reg_ENM/")
+folder3<-"C:/Modelos_ANLA/6. Registros_finales/2. Reg_ENM/"
+file_list3 <- list.files(path=folder3, pattern="*.csv") # Crear una lista de todos los .csv en la carpeta
+list9<-lapply(file_list3, read.csv2, header = TRUE) # Cargar todos los csv.
+
+############
+folder <- paste0("C:/Modelos_ANLA/5. Bios_M/", especie,"/")
+file_list <- list.files(path=folder, pattern="*.asc") # Crear una lista de todos los .csv en la carpeta
+envs <- stack(list.files(path=folder, pattern="*.asc",full.names=TRUE)) # Cargar variables
+crs(envs) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+envs
+############
+
+# Cargar datos filtrados presencias,BG en SWD y Capas bioclimáticas.
+rms <- seq(0.5,4, 0.5)
+fc <- c("L", "Q","H","LQ", "LQH")
+#Obtención de modelo con ENMeval,
+eval1 <- ENMevaluate(list9[[1]][,3:4], envs, method='randomkfold',kfolds = 10,
+                     RMvalues= rms, n.bg = 14000,
+                     fc= fc,
+                     clamp = FALSE,
+                     extrapolate = FALSE,
+                     overlap=FALSE, parallel=TRUE, numCores= 4,
+                     algorithm='maxent.jar',
+                     rasterPreds=TRUE # Si FALSE entonces no puede calcular AICc.
+)
+
+# Pull out the results table
+results <- eval1@results
+
+##################################
+#### Selecting optimal models ####
+## Jackknife technique
+# Define this function, then call the function on the results object
+optimize <- function(res) {
+  ### Remove any candidate model that has an AUC less than 0.51, ~= models with no discrimination
+  opt.auc <- res[res$train.AUC >= 0.7,]
+  ### Remove any candidates that have no parameters
+  no.param <- opt.auc[opt.auc$parameters != 0,]
+  ### Remove any candidates where the AIC score was NA (too many parameters)
+  noAICNA<- no.param[which(!is.na(no.param$AICc)),]
+  ### Remove any models that have an OR of zero
+  noOR0 <- noAICNA[noAICNA$avg.test.or10pct != 0,]
+  ### Order the remaining list by lowest OR then highest AUC, sequentially
+  ordered <- noOR0[with(noOR0, order(avg.test.or10pct, -train.AUC)), ]
+  ### Select the settings of the first model (the optimal model)
+  ordered[1,]
+}
+
+Jackknife <- optimize(results)
+best_mod<-as.numeric(row.names(Jackknife))
+eval1@models[[best_mod]]
+#Mover archivo desde C y Ubicar en temporal para leer:
+#C:\Users\elkin.noguera\AppData\Local\Temp\RtmpW0EsX8\raster\Maxent
+
+## Hacer predicción del modelo.
+#Clogis_mod <- predict(eval1@models[[1]], envs, args = "outputformat=Cloglog")
+logis_mod <- predict(eval1@models[[best_mod]], envs, args = "outputformat=logistic")
+writeRaster(logis_mod, filename=paste0("C:/Modelos_ANLA/7. Modelos/", especie, "/",especie,"_logi.tif"),format="GTiff") # Escribir el raster del modelo óptimo.
+plot(logis_mod)
+points(eval1@occ.pts)
+occ2var <- extract(logis_mod ,eval1@occ.pts)
+pr_thr_v <- quantile(occ2var, 0.1) 
+pr_thr <- logis_mod>pr_thr_v
+plot(pr_thr)
+writeRaster(pr_thr,filename= paste0("C:/Modelos_ANLA/7. Modelos/", especie, "/",especie,"_TP.tif"),format="GTiff") # Escribir el raster del modelo óptimo.
+save.image(paste0("C:/Modelos_ANLA/7. Modelos/", especie, "/", especie,"_MX.RData"))
+
+#prob_values<- as.matrix(occ2var)
+
+#extract model estimated suitability for occurrence localities
+est.loc <- extract(logis_mod,  eval1@occ.pts)
+#extract model estimated suitability for background
+est.bg <- extract(logis_mod, eval1@bg.pts)
+#evaluate predictive ability of model
+ev <- evaluate(est.loc, est.bg)
+#detect possible thresholds 
+thr <- threshold(ev)
+
+#               kappa spec_sens no_omission prevalence equal_sens_spec sensitivity
+#thresholds 0.6484395  0.532207   0.3002892 0.03703235       0.4986938   0.4028787
+
+#save.image(paste0("C:/Modelos_ANLA/7. Modelos/", especie, "/", especie, "_MX.RData"))
+
+rm(list = ls())
