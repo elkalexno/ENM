@@ -1,0 +1,60 @@
+library("dismo")
+library("ENMeval")
+library('parallel')
+
+require ("raster")
+require("rgdal")
+##################################Registros
+read.csv2("Directorio/Registros", header = TRUE) # Directorio de la tabla registros y nombre de la tabla de registros: formato "SPEC";"LON";"LAT"
+especie <- "Nombre_archivo" # Poner nombre de la carpeta de salida.
+dir.create(paste0("Directorio_salida", especie)) # Incluir el directorio en donde se ubicaran los resultados para crear la carpeta de salida.
+
+############ Variables
+setwd("Dir1/") # Directorio de las variables
+folder<-"Dir1/" # Directorio de las variables
+file_list <- list.files(path=folder, pattern="*.asc") # Crear una lista de todos los .csv en la carpeta
+envs <- stack(list.files(path=folder, pattern="*.asc",full.names=TRUE)) # Cargar variables
+crs(envs) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+envs
+
+##################################EnvMeval
+# Cargar datos filtrados presencias,BG en SWD y Capas bioclimáticas.
+rms <- seq(0.5,6, 0.5)
+fc <- c("L", "Q","H","LQ", "LQH")
+#Obtención de modelo con ENMeval,
+eval1 <- ENMevaluate(list9[[1]][,3:4], envs, method='randomkfold',kfolds = 4,
+                     RMvalues= rms, n.bg = 10000,
+                     fc= fc,
+                     clamp = FALSE,
+                     extrapolate = FALSE,
+                     overlap=FALSE, parallel=TRUE, numCores= 4,
+                     algorithm='maxent.jar',
+                     rasterPreds=TRUE
+)
+
+# Ver los resultados
+results <- eval1@results
+
+################################## 
+eval1@results[which(eval1@results$delta.AICc==0),] #
+
+logis_modAIC <- predict(eval1@results[which(eval1@results$delta.AICc==0),], envs, args = "outputformat=logistic") # Predecir el modelo logistico
+writeRaster(logis_modAIC, filename="Directorio de salida/Modelo_logi.tif",format="GTiff") # Escribir el raster del modelo óptimo.
+plot(logis_mod)
+points(eval1@occ.pts)
+
+#Calcular umbral de corte, por ejemplo ten percentil.
+occ2var <- extract(logis_modAIC ,eval1@occ.pts) # Extraer valores de probabilidad para los puntos de presencia.
+pr_thr_v <- quantile(occ2var, 0.1) 
+pr_thr <- logis_mod>pr_thr_v
+plot(pr_thr)
+writeRaster(pr_thr,filename= "Directorio_salida/Especie_Log_TP.tif"),format="GTiff") # Escribir el raster del modelo óptimo binario.
+save.image("Directorio_salida/Especie_MX.RData")) # Almacenar espacio de trabajo.
+
+# Estimar otro umbral según optimización de metrica de evaluación.
+est.bg <- extract(logis_modAIC, eval1@bg.pts) # Extraer probabilidad para background points.
+ev <- evaluate(est.loc, est.bg) #Evaluar la habilidad de predicción del modelo
+thr <- threshold(ev) #Detectar posibles umbrales 
+save.image("Directorio_salida/Especie_MX.RData")) # Almacenar espacio de trabajo.
+
+rm(list = ls()) # Borrar todo el contenido.
