@@ -1,0 +1,35 @@
+library("dismo")
+library("rgdal")
+#------------Accesos carpetas almacenamiento y shape mascaras
+opath1 <- "Dir_M/" # Directorio para guardar las capas recortadas.
+pname1 <- raster("./msk.tif")  # Nombre del archivo raster de las mascara.
+
+#-----------------------------------------------------Especie
+#Seleccionar directorio de trabaja.
+setwd("Dir/") # Definir el directorio de la carpeta en donde se encuentran las capas a recortar.
+ipath <- "Dir/"  # Cargar el directorio de las capas a recortar. 
+#
+opath <- opath1 # Renombrar mascara de trabajo.
+
+#Read your polygon boundary
+ppoly <- pname1 #if this doesn't work theyn maybe you do not have the package loaded? 
+
+#Identificar extensión espacial de la mascara.
+e <- extent(ppoly)
+
+#Identificar la lista de imagenes que se desean recortar.
+files <- list.files(ipath, pattern=".tif$", full.names=FALSE) # tif si las capas estan en tif, o asc si las capas son ascii.
+stopifnot(length(files)>0)
+
+#Incluir directorio de salida.
+outfiles <- paste0(opath, files) #
+
+#Change extension
+extension(outfiles) <- "tif" # .tif o asc. 
+
+for (f in 1:length(files)){
+  r <- raster(files[f])
+  rc <- crop(r, e)
+  rm <- mask(rc, ppoly)
+  rw <- writeRaster(rm,outfiles[f],overwrite=TRUE)
+}
