@@ -1,0 +1,21 @@
+library(dismo)
+library(ENMeval)
+library(dismo)
+library(rgeos)
+library(tmap)
+library(rgdal)
+library(sf)
+
+nomb <- list.files("C:/Modelos_ANLA/8. Politico_Colombia/BioModelos_ext_col/")
+
+rempl<-function(ipath1,opath){
+  r <- raster(ipath1)
+  r <- clamp(r, lower=1, useValues=FALSE)
+  crs(r) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+  rw <- writeRaster(r,opath,format="GTiff",overwrite=TRUE)
+}
+
+for (i in 1:length(nomb)){
+  rempl (paste0("C:/Modelos_ANLA/8. Politico_Colombia/BioModelos_ext_col/",nomb[i]),
+               paste0("C:/Modelos_ANLA/8. Politico_Colombia/BioModelos_ext_reclas/",nomb[i]))
+}
