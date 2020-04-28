@@ -1,0 +1,35 @@
+library(dismo)
+library(rgeos)
+library(tmap)
+library(rgdal)
+library(sf)
+
+colombia <- shapefile("C:/Modelos_ANLA/8. Politico_Colombia/Limite_Pais_2016_IGAC.shp")
+colombia <- spTransform(colombia, "+proj=longlat +ellps=WGS84")
+
+#Cambiar el directorio:
+setwd("C:/Modelos_ANLA/6. Registros_finales/1. Finales_curadas")
+folder<-"C:/Modelos_ANLA/6. Registros_finales/1. Finales_curadas/"
+file_list <- list.files(path=folder, pattern="*.csv") # Crear una lista de todos los .csv en la carpeta
+file_list <- do.call(rbind,strsplit(file_list, "_"))
+file_list <- file_list[,1]
+
+
+
+##Function to cut raster
+Crop_raster<-function(ipath1,opath){
+  ppoly <- shapefile("C:/Modelos_ANLA/8. Politico_Colombia/Limite_Pais_2016_IGAC.shp")
+  ppoly <- spTransform(ppoly, "+proj=longlat +ellps=WGS84")
+  e <- extent(ppoly)
+  r <- raster(ipath1)
+  rc <- crop(r, e)
+  rm <- mask(rc, ppoly)
+  crs(rm) <-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+  rw <- writeRaster(rm,opath,format="GTiff",overwrite=TRUE)
+  }
+
+for (i in 1:length(file_list)){
+  Crop_raster (paste0("C:/Modelos_ANLA/7. Modelos/",file_list[i],"/",
+                      list.files(paste0("C:/Modelos_ANLA/7. Modelos/",file_list[i]),pattern="*TP.tif")),
+    paste0("C:/Modelos_ANLA/8. Politico_Colombia/BioModelos_ext_col/",file_list[i],"_TP_1k.tif"))
+}
