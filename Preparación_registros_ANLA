@@ -1,0 +1,184 @@
+library(dismo)
+library(ENMeval)
+library(dismo)
+library(rgeos)
+library(tmap)
+library(rgdal)
+
+#set 'working directory'
+setwd('C:/Modelos_ANLA')
+setwd("C:/Modelos_ANLA")
+#identify data frame from .csv file
+occs <- read.table("C:/Modelos_ANLA/datos_mamm_ANLA_Set16_fin.csv", header = TRUE,  sep=",") # Cargar datos presencia
+head(occs)
+nrow(occs) # Ocurrencias
+colnames(occs)
+names(occs)[names(occs) == "lat"] <- "LAT"
+names(occs)[names(occs) == "lon"] <- "LON"
+names(occs)[names(occs) == "species"] <- "SPEC"
+
+#Get the list of unique Spec names
+for (name in levels(occs$SPEC)){
+  #Subset the data by SPEC
+  tmp=subset(occs,SPEC==name)
+  #Create a new filename for each Spec
+  fn=paste('1_Registros_orig/',gsub(' ','',name),sep='',".csv")
+  #Save the CSV file containing separate expenses data for each MP
+  write.csv(tmp,fn,row.names=FALSE)
+}
+
+#############Create a list to prun duplicate and unlocate records.
+#("/2. Registros_sin_duplic)
+#Cambiar el directorio:
+setwd("C:/Modelos_ANLA/1. Registros_orig/")
+folder<-"C:/Modelos_ANLA/1. Registros_orig/"
+file_list <- list.files(path=folder, pattern="*.csv") # Crear una lista de todos los .csv en la carpeta
+list7<-lapply(file_list, read.csv, header = TRUE) # Cargar todos los csv.
+head(list7[[1]])
+list8 <- lapply(1:length(list7), function(i) duplicated (list7  [[i]] [, c('LON', 'LAT')]))
+list9 <- lapply(1:length(list7), function(i) list7[[i]][!list8[[i]], ])
+#Verify coordenates near to 0.
+list10 <- lapply(1:length(list9), function(i) list9$LON > 0 & list9$LAT > 0) # No records with 0 lon-lat.
+
+# Verification on a map.
+library(maptools)
+
+map_ek <- function(j, list_e) {
+  main<- unique(list9[[j]]$SPEC)
+  data_spec<- list9[[j]]
+  coordinates(data_spec) <- ~LON+LAT
+  crs(data_spec) <- crs(wrld_simpl)
+  jpeg(paste0("C:/Modelos_ANLA/2.1. Figures/",main,".jpg"), width = 537, height = 484)
+  plot(data_spec, main= main)
+  plot(wrld_simpl, add=T, border='blue', lwd=2)
+dev.off()
+}
+
+for (i in 1:46) {
+  map_ek(i,list9)
+}
+
+############# Create a list to sphThin.
+library(spThin)
+library(maptools)
+library(data.table)
+dir.create("C:/Modelos_ANLA/3. Registros_spThin")
+#Cambiar el directorio:
+setwd("C:/Modelos_ANLA/3. Registros_spThin")
+folder<-"C:/Modelos_ANLA/1. Registros_originales/"
+file_list <- list.files(path=folder, pattern="*.csv") # Crear una lista de todos los .csv en la carpeta
+save.image("C:/Modelos_ANLA/Datos_mam_filtrados.RData")
+
+######################
+############### Filtrado con SpThin en Bach
+#####################
+library(dplyr)
+file_list2 <- sapply(strsplit(file_list, split='.', fixed=TRUE), function(x) (x[1])) # Quitar extensiion .csv del nombre de los objetos en la lista.
+names(list9) <- file_list2 # Poner nombres a los objetos de la lista
+head(list9)
+
+list_thin_loc<- lapply(1:length(list9), function(i) thin (list9  [[i]][,c("SPEC","LAT","LON")],
+                                          lat.col ="LAT", long.col ="LON", spec.col ="SPEC", 
+                                          thin.par=10, reps=10, locs.thinned.list.return =TRUE, 
+                                          write.files =TRUE, max.files = 1, 
+                                          out.dir="C:/Modelos_ANLA/3. Registros_spThin", 
+                                          out.base = (file_list2[[i]]),verbose =FALSE
+                                          ))
+save.image("C:/Modelos_ANLA/Datos_mam_filtrados.RData")
+names(list_thin_loc) <- file_list2 # Poner nombres a los objetos de la lista
+summary(list_thin_loc[[1]])
+
+##########################
+bgExt <- rgeos::gBuffer(sp_poly, width = 4)
+coords <- bgExt@polygons[[1]]@Polygons[[1]]@coords
+sp_poly <- SpatialPolygons(list(Polygons(list(Polygon(coords)), ID=1)))
+sp_poly_df <- SpatialPolygonsDataFrame(sp_poly, data=data.frame(ID=1))
+writeOGR(sp_poly_df, "C_rothschildi_chull", layer="c_hull", driver="ESRI Shapefile") #Cambiar nombre xx----
+################### Create M area
+##########################
+setwd("C:/Modelos_ANLA/4. Convex_hull")
+con_hull <- function(j, list_e) {
+            occs.xy <- list9[[j]][,c("LON","LAT")]
+            sp::coordinates(occs.xy) <- ~ LON + LAT
+            hull <- convHull(occs.xy, lonlat=TRUE)
+            coords <- hull@polygons@polygons[[1]]@Polygons[[1]]@coords
+            sp_poly <- SpatialPolygons(list(Polygons(list(Polygon(coords)), ID=1)))
+            crs(sp_poly) <- "+proj=lcc +lat_1=48 +lat_2=33 +lon_0=-100 +ellps=WGS84"
+                        bgExt <- rgeos::gBuffer(sp_poly, width = 2)
+                        coords <- bgExt@polygons[[1]]@Polygons[[1]]@coords
+                        sp_poly <- SpatialPolygons(list(Polygons(list(Polygon(coords)), ID=1)))
+                        sp_poly_df <- SpatialPolygonsDataFrame(sp_poly, data=data.frame(ID=1))
+                        fn=paste('C:/Modelos_ANLA/4. Convex_hull/',gsub(' ','',file_list2[[j]]))
+                        crs(sp_poly_df) <- "+proj=lcc +lat_1=48 +lat_2=33 +lon_0=-100 +ellps=WGS84"
+                        writeOGR(sp_poly_df, fn, layer= file_list2[[j]], driver="ESRI Shapefile") 
+}
+
+for (i in 1:46) {
+  con_hull (i,list9)
+}
+
+############
+########################### Clipping raster using M.
+setwd("C:/Users/elkin.noguera/Documents/WC2.0Bios30_wc2_amer_cut/")
+ipath1 <- "C:/Users/elkin.noguera/Documents/WC2.0Bios30_wc2_amer_cut/" 
+#Create directories M layers
+opath_all<- paste0(rep('C:/Modelos_ANLA/5. Bios_M/',46),file_list2)
+for (i in 1:46) {
+  dir.create (opath_all[[i]])
+}
+# Upload M shapefiles
+opath_all2<- paste0(rep('C:/Modelos_ANLA/5. Bios_M/',46),file_list2,"/")
+path_hull <- paste0(rep('C:/Modelos_ANLA/4. Convex_hull/',46)," ",file_list2,"/",file_list2,".shp")
+shapefile(path_hull[[2]])
+
+##Function to cut raster
+BatchCrop<-function(ppoly,opath){
+  ppoly <- shapefile(ppoly)
+  e <- extent(ppoly)
+  files <- list.files(ipath1, pattern=".tif$", full.names=FALSE)
+  stopifnot(length(files)>0)
+  ipath1 <- "C:/Users/elkin.noguera/Documents/WC2.0Bios30_wc2_amer_cut/" 
+  outfiles <- paste0(opath_all2[[i]], files) 
+  extension(outfiles) <- "asc"
+  for (i in 1:length(files)){
+    r <- raster(files[i])
+    rc <- crop(r, e)
+    rm <- mask(rc, ppoly)
+    rw <- writeRaster(rm,outfiles[i],overwrite=TRUE)
+  }
+}
+
+for (i in 1:46) {
+  BatchCrop (path_hull[[i]],opath_all2[[i]])
+}
+
+BatchCrop (ipath1,file_list2[[1]],opath_all2[[1]])
+
+############Revisión manual de registros. 
+##### C:/Modelos_ANLA/3. Registros_spThin/Finales_curadas
+############ Split records to training and Partial-ROC.
+
+save.image("C:/Modelos_ANLA/Datos_mam_filtrados.RData")
+
+setwd("C:/Modelos_ANLA/6. Registros_finales/")
+folder3<-"C:/Modelos_ANLA/6. Registros_finales/Finales_curadas/"
+file_list3 <- list.files(path=folder3, pattern="*.csv") # Crear una lista de todos los .csv en la carpeta
+list9<-lapply(file_list3, read.csv, header = TRUE) # Cargar todos los csv.
+save.image("C:/Modelos_ANLA/Datos_mam_filtrados.RData")
+
+####################
+
+occ<-list9[[19]][,1:3]
+summary(occ)
+names(occ)[names(occ) == "latitude"] <- "LAT"
+names(occ)[names(occ) == "longitude"] <- "LON"
+names(occ)[names(occ) == "name"] <- "SPEC"
+nrow(occ) # Ocurrencias
+random <- get.randomkfold(occ, occ, k=4) # Crear las particiones de los datos.
+occ_grupos<-cbind(occ,random$occ.grp)
+dats_entren<-rbind(occ_grupos[occ_grupos[,4]==1,],occ_grupos[occ_grupos[,4]==2,],occ_grupos[occ_grupos[,4]==3,]) # Extraer uno de los subgrupos para crear el modelo, 3 primeros binds.
+punt_eval<-subset(occ,random$occ.grp==4) # Puntos de evaluación para ROC parcial.
+write.csv2(dats_entren[,1:3],file="./Reg_mod_U_cinereoargenteus.csv")
+write.csv2(punt_eval[,1:3],file="./Reg_ROC_U_cinereoargenteus.csv")
+
+save.image("C:/Modelos_ANLA/Datos_mam_filtrados.RData")
