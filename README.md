@@ -1,4 +1,4 @@
-# Project Title
+# ENM/SDM
 
 Scripts used to run ecological niche models using R. 
 
