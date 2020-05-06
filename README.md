@@ -43,4 +43,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* To Robert J. Hijmans, Steven Phillips, John Leathwick and Jane Elith for open the code to performance ENM.
+* To Robert J. Hijmans, Steven Phillips, John Leathwick and Jane Elith for releasing the code to performance ENM.
