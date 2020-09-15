@@ -1,0 +1,107 @@
+#Load libraries
+library(shiny)
+library(leaflet)
+library(mapview)
+library(sp)
+library(rgdal)
+library(raster)
+
+ui <- fluidPage(
+  # App title ----
+    titlePanel("BioMAD"),
+    sidebarPanel(
+  p(),
+    h1("Ingrese puntos:"),
+  p(),
+    numericInput("long", label = h3("Longitud:"), value = -73.839222),
+    numericInput("lat", label = h3("Latitud:"), value = 4.721806),
+    actionButton("locality", "Mapear"),
+  p(),
+   # Button
+  downloadButton("downloadData", "Download"),
+  p(),
+  p("BioMAD -BioModelos Apoya Decisiones-, es una herramienta desarrollada para generar 
+    listados preliminares de especies a partir de la consulta de los mapas validados
+    disponibles en BioModelos."),
+  p(" Se sugiere usar con prudencia los listados generados. Si desea
+    conocer las distribuciones de las especies listadas, por favor consulte", 
+    a("BioModelos.", href = "http://biomodelos.humboldt.org.co/")), 
+  "Creado por Elkin A. Noguera-Urbano usando", a("Shiny.",
+                          href = "http://shiny.rstudio.com")), 
+  img(
+    src = "humboldt.png",
+    width = "850px", height = "100px"
+  ),
+  
+
+mainPanel(
+    leafletOutput("mymap"),
+    p(),
+    fluidRow(
+      column(4,
+             DT::dataTableOutput('table')
+      )
+    )
+    )
+)
+
+server <- function(input, output, session) {
+  
+  # Crea formato para los datos de la lacalidad ingresados por el usuario. 
+  points <- eventReactive(input$locality, {
+    loc_user<-cbind(input$long, input$lat)
+    print(loc_user)
+    }, ignoreNULL = FALSE)
+  
+  # Dibuja el mapa en el panel principal.
+  output$mymap <- renderLeaflet({
+    leaflet() %>%
+      setView(lat = 4.721806, lng = -73.839222, zoom = 7) %>%
+      addTiles() %>%
+      addEasyButton(easyButton(
+        icon="fa-globe", title="Zoom to Level 5",
+        onClick=JS("function(btn, map){ map.setZoom(5); }"))) %>%
+        addMarkers(data = points())
+  })
+  
+  # Dibuja la localidad base en el mapa.
+  observeEvent(input$locality,{
+    isolate({
+      new_zoom <- 10
+      if(!is.null(input$map_zoom)) new_zoom <- input$map_zoom
+      leafletProxy('mymap') %>%
+        setView(lng = input$long, lat = input$lat, zoom = new_zoom)
+    })
+  })
+  
+  # Carga la localidad y cruza con shapefiles BioModelos. 
+  # spec_cross representa la tabla producto del cruce BioModelos * localidad.
+ spec_cross <-eventReactive(input$locality, {
+    temp<-cbind(input$long, input$lat)
+    temp<-as.data.frame(temp)
+    colnames(temp)<-c("x","y")
+    temp <- SpatialPointsDataFrame(temp,temp)
+    crs(temp) <- "+proj=longlat +datum=WGS84 +no_defs"
+    maps<-readOGR("./appData/Biom_UICN.shp") # Cargar archivo shapefile BioModelos.
+    as.data.frame(over(temp,maps,returnList = TRUE))
+    })
+  
+  # Muestra la tabla en el panel principal.
+  # Table of selected dataset ----
+  output$table <- DT::renderDataTable({
+    spec_cross()
+  })
+ 
+ # Permite descargar la tabla "Downloadable csv" resultante.
+ output$downloadData <- downloadHandler(
+   filename = function() {
+     paste("Especies sugeridas",date(),".csv", sep = " ")
+   },
+   content = function(file) {
+     write.table(spec_cross(), file, row.names = FALSE,sep = ",")
+   }
+ )
+ 
+}
+
+shinyApp(ui, server)
