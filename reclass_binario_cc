@@ -15,6 +15,8 @@ dir.in # Directorio de almaceniamiento de los raster cc
 x # Carpeta de la especie que contiene todos los resultados del modelamiento de la especie.
 
 #Función
+```R
+/*
 reclass_cc<- function(dir_in = NA, name = NA){
   umbrales<-read.table(paste0(dir_in,name,"/ensembles/current/MAXENT/binValues_MAXENT.csv"), sep = ",", header= TRUE) # Leer los umbrales
   umbrale <- umbrales[1,1]
@@ -86,7 +88,8 @@ reclass_cc<- function(dir_in = NA, name = NA){
   overwrite = T
   )
 }
-
+*/
+```
 #####################
 ####################### Aplicar a todas las carpetas que se encuentran en el disco duro.
 #Cargar nombres de especies
