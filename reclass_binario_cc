@@ -1,0 +1,94 @@
+library(terra)
+library(raster)
+library(sp)
+library(rgdal)
+library(dplyr)
+
+setwd("I:/BioModelos_4k2022")
+
+# Función
+#### Explicación de parametros de la función
+dir.in # Directorio de almaceniamiento de los raster cc
+x # Carpeta de la especie que contiene todos los resultados del modelamiento de la especie.
+
+#Función
+reclass_cc<- function(dir_in = NA, name = NA){
+  umbrales<-read.table(paste0(dir_in,name,"/ensembles/current/MAXENT/binValues_MAXENT.csv"), sep = ",", header= TRUE) # Leer los umbrales
+  umbrale <- umbrales[1,1]
+  umbrale_code <- colnames(umbrales[1])
+  umbral0<- umbrales[1,2]
+  umbral0_code <- colnames(umbrales[2])
+  umbral10 <- umbrales[1,3]
+  umbral10_code <- colnames(umbrales[3])
+  umbral20 <- umbrales[1,4]
+  umbral20_code <- colnames(umbrales[4])
+  umbral30 <- umbrales[1,5]
+  umbral30_code <- colnames(umbrales[5])
+  dir.fut<-paste0(dir_in,name,"/ensembles/future/MAXENT/") # Leer el directorio de las capas cc
+  modelos_cc<- rast(list.files(dir.fut,".asc_MAXENT.tif",full.names=T)) # Leer los raster continuos cc
+  FileList<-list.files(dir.fut,".asc_MAXENT.tif",full.names=T,recursive=TRUE) # Crear lista de archivos cc
+  names(modelos_cc) <- basename(FileList) # Poner nombre en el ambiente R, ya que estaban siendo cargados como Layers sin nombre.
+  modelos_name <- gsub('.asc_MAXENT.tif$', '', names(modelos_cc))
+  # reclasificar y escribir
+  rec_e<- modelos_cc > umbrale
+  dir.out <- dir.fut
+  dir.create(file.path(dir.out,"CC_actualizado"), showWarnings = FALSE)
+  writeRaster(rec_e, filename=file.path (paste0(dir.out,"CC_actualizado"), 
+                                        paste0(modelos_name,"_", "Cor_",umbrale_code, ".tif")
+  ),
+  overwrite = T,
+  datatype = "INT2S",
+  NAflag = -9999,
+  gdal=c("COMPRESS=LZW")
+  )
+  rec_e<- modelos_cc > umbral0
+  writeRaster(rec_e, filename=file.path (paste0(dir.out,"CC_actualizado"), 
+                                         paste0(modelos_name,"_", "Cor_",umbral0_code, ".tif")
+  ),
+  overwrite = T,
+  datatype = "INT2S",
+  NAflag = -9999,
+  gdal=c("COMPRESS=LZW")
+  )
+  rec_e<- modelos_cc > umbral10
+  writeRaster(rec_e, filename=file.path (paste0(dir.out,"CC_actualizado"), 
+                                         paste0(modelos_name,"_", "Cor_",umbral10_code, ".tif")
+  ),
+  overwrite = T,
+  datatype = "INT2S",
+  NAflag = -9999,
+  gdal=c("COMPRESS=LZW")
+  )
+  rec_e<- modelos_cc > umbral20
+  writeRaster(rec_e, filename=file.path (paste0(dir.out,"CC_actualizado"), 
+                                         paste0(modelos_name,"_", "Cor_",umbral20_code, ".tif")
+  ),
+  overwrite = T,
+  datatype = "INT2S",
+  NAflag = -9999,
+  gdal=c("COMPRESS=LZW")
+  )
+  rec_e<- modelos_cc > umbral30
+  writeRaster(rec_e, filename=file.path (paste0(dir.out,"CC_actualizado"), 
+                                         paste0(modelos_name,"_", "Cor_",umbral30_code, ".tif")
+  ),
+  overwrite = T,
+  datatype = "INT2S",
+  NAflag = -9999,
+  gdal=c("COMPRESS=LZW")
+  )
+  writeRaster(modelos_cc, filename=file.path (paste0(dir.out,"CC_actualizado"), 
+                                         paste0(modelos_name, "_maxent", ".tif")
+  ),
+  overwrite = T
+  )
+}
+
+#####################
+####################### Aplicar a todas las carpetas que se encuentran en el disco duro.
+#Cargar nombres de especies
+list_espec<- list.files(path=".", pattern=NULL, all.files=FALSE,
+           full.names=FALSE) # Cargar todos los archivos del directorio en el que se encuentran los modelos.
+list_espec <- list_espec[1:663] # Seleccionar solo las carpetas de las especies modeladas.
+
+lapply(1:length(list_espec), function(i) reclass_cc(dir_in = "I:/BioModelos_4k2022/", name = list_espec[[i]]))
