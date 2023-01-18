@@ -1,3 +1,6 @@
+---
+title: "Reclasificador_mapas_binarios"
+---
 library(terra)
 library(raster)
 library(sp)
